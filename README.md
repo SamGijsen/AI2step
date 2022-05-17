@@ -53,7 +53,7 @@ da Silva, C. F. & Hare, T. A. Humans primarily use model-based inference in the 
     # Specify task and generate (potential) observations
     task = {  
         "type": "drift",
-        "T": T,
+        "T": 200,
         "x": False,
         "r": True,
         "delta": 0.025
