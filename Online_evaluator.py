@@ -10,13 +10,17 @@ from twostep_support import *
 def eval_LL_AI(params, observations, actions, learning, mtype):
     """
     Evaluate likelihood for a sequence of actions given a sequence of observations (performed trial-wise).
-    v  = environmental variability
-    lam = precision on expected free energy
-    obs = sequence of observations
-    actions = sequence of taken actions
-    K = amount of arms
-    """
 
+    ~~~~~~
+    INPUTS
+    ~~~~~~
+    params: model parameters
+    observations: sequence of transition and outcome observations
+    actions: sequence of taken actions
+    learning: learning algorithm used (Default is "PSM": Predictive-surprise modulated learning)
+    mtype: integer specifying submodel
+    """
+    
     lr = params[0]
     vunsamp = params[1]
     vsamp = params[2]
@@ -120,6 +124,13 @@ def eval_LL_AI(params, observations, actions, learning, mtype):
 def eval_LL_RL(params, observations, actions):
     """
     Evaluate likelihood for a sequence of actions given a sequence of observations (performed trial-wise).
+
+    ~~~~~~
+    INPUTS
+    ~~~~~~
+    params: model parameters
+    observations: sequence of transition and outcome observations
+    actions: sequence of taken actions
     """
     a1 = params[0]
     a2 = params[1]
@@ -175,7 +186,21 @@ def eval_LL_RL(params, observations, actions):
     return -np.sum(np.log(La)) # minimize logs
 
 def MLE_magiccarpet(params, obs, actions, learning, lower_bounds, upper_bounds, n_starts, model, mtype, seed=1):
+    """
+    This function calls scipy.op.minimize() repeatedly to perform maximum likelihood estimation.
 
+    ~~~~~~
+    INPUTS
+    ~~~~~~
+    params: model parameters
+    obs: sequence of transition and outcome observations
+    actions: sequence of taken actions
+    learning: learning algorithm
+    lower_bounds, upper_bounds: each parameter needs a min and max bound between which the minimizer functions
+    n_starts: amount of iterations. be careful of local minima in case n_starts < 10
+    model: active inference (AI) or reinforcement learning (RL)
+    mtype: submodel type for active inference
+    """
     np.random.seed(seed)
 
     nump = len(params)

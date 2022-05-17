@@ -4,17 +4,21 @@ import pandas as pd
 import os
 import sys
 
-from twostep_learning_acting import *
-from twostep_support import *    
+import models
+from utils.twostep_support import *    
 
 def eval_LL_AI(params, observations, actions, learning, mtype):
     """
     Evaluate likelihood for a sequence of actions given a sequence of observations (performed trial-wise).
-    v  = environmental variability
-    lam = precision on expected free energy
-    obs = sequence of observations
-    actions = sequence of taken actions
-    K = amount of arms
+
+    ~~~~~~
+    INPUTS
+    ~~~~~~
+    params: model parameters
+    observations: sequence of transition and outcome observations
+    actions: sequence of taken actions
+    learning: learning algorithm used (Default is "PSM": Predictive-surprise modulated learning)
+    mtype: integer specifying submodel
     """
 
     lr = params[0]
@@ -85,7 +89,7 @@ def eval_LL_AI(params, observations, actions, learning, mtype):
                 gamma = gam1
             else:
                 gamma = gam2
-            a_t, g = action_selection_AI(t, state, pi, tm, lr, vunsamp, vsamp, vps, lam, kappa_a, prev_a, learning, gamma, prior_nu, prior_r, False)
+            a_t, g = models.learn_and_act.action_selection_AI(t, state, pi, tm, lr, vunsamp, vsamp, vps, lam, kappa_a, prev_a, learning, gamma, prior_nu, prior_r, False)
             gq = np.exp(g) / np.sum(np.exp(g))
 
             if step==0:
@@ -120,7 +124,15 @@ def eval_LL_AI(params, observations, actions, learning, mtype):
 def eval_LL_RL(params, observations, actions):
     """
     Evaluate likelihood for a sequence of actions given a sequence of observations (performed trial-wise).
+
+    ~~~~~~
+    INPUTS
+    ~~~~~~
+    params: model parameters
+    observations: sequence of transition and outcome observations
+    actions: sequence of taken actions
     """
+
     a1 = params[0]
     a2 = params[1]
     lam = params[2]
@@ -175,6 +187,21 @@ def eval_LL_RL(params, observations, actions):
     return -np.sum(np.log(La)) # minimize logs
 
 def MLE_magiccarpet(params, obs, actions, learning, lower_bounds, upper_bounds, n_starts, model, mtype, seed=1):
+    """
+    This function calls scipy.op.minimize() repeatedly to perform maximum likelihood estimation.
+
+    ~~~~~~
+    INPUTS
+    ~~~~~~
+    params: model parameters
+    obs: sequence of transition and outcome observations
+    actions: sequence of taken actions
+    learning: learning algorithm
+    lower_bounds, upper_bounds: each parameter needs a min and max bound between which the minimizer functions
+    n_starts: amount of iterations. be careful of local minima in case n_starts < 10
+    model: active inference (AI) or reinforcement learning (RL)
+    mtype: submodel type for active inference
+    """
 
     np.random.seed(seed)
 
@@ -222,7 +249,8 @@ def MLE_magiccarpet(params, obs, actions, learning, lower_bounds, upper_bounds, 
     return params[:,best_iter], LL[best_iter], LL
 
 # Input is an integer from sbatch, serving as reference to 1 subject, as well as setting the random seed.
-s = int(sys.argv[1]) - 1 # batch is submitted 1-to-n_subs
+#s = int(sys.argv[1]) - 1 # batch is submitted 1-to-n_subs
+s = 1
 
 # spaceship or magic_carpet
 model = "AI" # RL or AI
@@ -238,7 +266,8 @@ if task == "spaceship": # 21 subjects
 elif task == "magic_carpet": # 24 subjects
     T = 201
 
-# participant choice data
+# participant choice data 
+
 pfdir = "/.../muddled_models/results/" + task + "/choices/"
 
 if model == "RL":
@@ -328,6 +357,7 @@ max_p, max_LL, LLs = MLE_magiccarpet(p_names,
                                         upper_bounds,
                                         n_starts,
                                         model=model,
+                                        mtype=mtype,
                                         seed=s)
 
 results_formatted = {"max_p": max_p,
