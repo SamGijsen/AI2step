@@ -6,28 +6,24 @@ To be completed in the upcoming weeks.
 <br/>
 
 ##### STRUCTURE
+```
+AI2Step
 
-##### Task and Models
+    +- `models.py`: contains RL and active inference learning and action selection algorithms. 
+    See below for example usage. Uses the following two files for support:
 
-`twostep_environment.py`: contains the code for the two-step task 
+    (Code for fitting and maximum likelihood estimation.These may be easily integrated into one file if preferred. 
+    Requires the data from the publications below.)
+    +- `MagicCarpet_Spaceship_evaluator.py`
+    +- `Online_evaluator.py`
+    +- `Shock_evaluator.py`
+    
+  ├── utils: helper functions    
+      +- `twostep_environment.py`: contains the code for the two-step task 
+      +- `twostep_support.py`: contains misc. support functions for the other code 
 
-`twostep_support.py`: contains misc. support functions for the other code 
+```
 
-`twostep_learning_acting.py`: contains RL and active inference learning and action selection algorithms
-
-<br/>
-
-##### Fitting via Maximum Likelihood Estimation
-
-These may be easily integrated into one file if preferred. Require the data from the publications below.
-
-`MagicCarpet_Spaceship_evaluator.py`
-
-`Online_evaluator.py`
-
-`Shock_evaluator.py`
-
-<br/>
 
 ##### Package requirements:
 
@@ -47,3 +43,38 @@ learning to avoid harming others. Proc. Natl. Acad. Sci. 117, 27719–27730 (202
 
 da Silva, C. F. & Hare, T. A. Humans primarily use model-based inference in the two-stage task. Nat. Hum. Behav. 4,
 1053–1066 (2020).
+
+
+#### Task and model example
+
+```
+    import models
+    
+    # Specify task and generate (potential) observations
+    task = {  
+        "type": "drift",
+        "T": T,
+        "x": False,
+        "r": True,
+        "delta": 0.025
+    }
+    
+    model = { # Model specification
+        "act": "AI",
+        "learn": "PSM",
+        "learn_transitions": False,
+        "lr": 1,
+        "vunsamp": 0.2,
+        "vsamp": 0.2,
+        "vps": 0.2, 
+        "gamma1": 5,
+        "gamma2": 5,
+        "lam": 0.1,
+        "kappa_a": 0.1,
+        "prior_r": 0.5
+        }
+        
+    temp = models.learn_and_act(task, model, seed=1)
+    actions, observations, beliefs, p_trans, p_r, Q = temp.perform_task()
+        
+```
