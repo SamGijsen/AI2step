@@ -4,8 +4,8 @@ import pandas as pd
 import os
 import sys
 
-from twostep_learning_acting import *
-from twostep_support import *      
+import models
+from utils.twostep_support import *    
 
 def eval_LL_AI(params, observations, actions, learning, mtype):
     """
@@ -20,7 +20,7 @@ def eval_LL_AI(params, observations, actions, learning, mtype):
     learning: learning algorithm used (Default is "PSM": Predictive-surprise modulated learning)
     mtype: integer specifying submodel
     """
-    
+
     lr = params[0]
     vunsamp = params[1]
     vsamp = params[2]
@@ -58,66 +58,58 @@ def eval_LL_AI(params, observations, actions, learning, mtype):
         vps = params[2]
 
 
+    #### ----------
+    # Specify task and generate (potential) observations
     T = observations.shape[0]
-    Steps = 2
+    task = {  
+        "type": "drift",
+        "T": T,
+        "x": False,
+        "r": True,
+        "delta": 0.025
+    }
+    
+    model = { # Model specification
+        "act": "AI",
+        "learn": "PSM",
+        "learn_transitions": False,
+        "lr": lr,
+        "vunsamp": vunsamp,
+        "vsamp": vsamp,
+        "vps": vps, 
+        "gamma1": gam1,
+        "gamma2": gam2,
+        "lam": lam,
+        "kappa_a": kappa_a,
+        "prior_r": prior_r
+        }
 
-    pi = np.ones((T+1,Steps,2,6))
-    # Construct prior distribution
-    if learning == "PSM":
-        prior = np.array([(1-prior_r)*prior_nu, prior_r*prior_nu])        
-        for step in range(Steps):
-            for a in range(2,6):
-                pi[:,step,:,a] = prior
+    temp = test_models.learn_and_act(task, model, seed=1)
+    La = np.ones((T,2))
 
-    # Initialize transition counts, transition matrix beliefs, and previously selected action
-    counts = np.zeros((2,2)) # 2 actions by 2 final states
-    tm = np.array([0.5, 0.5])
-    prev_a = 999
-
-    La = np.ones((T,Steps))
-
+    po = np.zeros(2)
+    pa = np.zeros(2)
+    
+    # Check which actions were taken and which outcomes observed
     for t in range(T):
-        for step in range(Steps):
-            if step == 0:
-                state = 0
-            else:
-                state = int(o) + 1 
-                counts[actions[t,0], int(observations[t,0])] += 1
+        po = observations[t,:].astype(int)
+        pa = actions[t,:].astype(int)
 
-            # Action selection
-            if step == 0:
-                gamma = gam1
-            else:
-                gamma = gam2
-            a_t, g = action_selection_AI(t, state, pi, tm, lr, vunsamp, vsamp, vps, lam, kappa_a, prev_a, learning, gamma, prior_nu, prior_r, False)
-            gq = np.exp(g) / np.sum(np.exp(g))
+        a, o, pi, p_trans, p_r, GQ = temp.perform_trial(t, pa, po)
 
-            if step==0:
-                prev_a = np.copy(int(actions[t,step]))
+        # softmax for both stages
+        GQ[t,0,:] = np.exp(GQ[t,0,:]) / np.sum(np.exp(GQ[t,0,:]))
+        GQ[t,po[0]+1,:] = np.exp(GQ[t,po[0]+1,:]) / np.sum(np.exp(GQ[t,po[0]+1,:]))
 
-            # Check participant action
-            La[t,step] = gq[int(actions[t,step])]
-            o = observations[t,step]
+        La[t,0] = GQ[t, 0, pa[0]]
+        La[t,1] = GQ[t, po[0]+1, pa[1]]
 
-            # Update model
-            if step == 1:
-                if state == 1:
-                    a = actions[t,step] + 2
-                elif state == 2:
-                    a = actions[t,step] + 4
-                else:
-                    raise("!")
-
-                # Learning
-                pi = PSM_learning(t, step, int(a), int(observations[t,step]), pi, tm, lr, vunsamp, vsamp, vps, prior_nu, prior_r, False)
-
-            # Determine most likely transition matrix
-            if (counts[0,0] + counts[1,1]) > (counts[0,1] + counts[1,0]):
-                tm = np.array([0.3, 0.7])
-            if (counts[0,0] + counts[1,1]) < (counts[0,1] + counts[1,0]):
-                tm = np.array([0.7, 0.3])
-            if (counts[0,0] + counts[1,1]) == (counts[0,1] + counts[1,0]):
-                tm = np.array([0.5, 0.5])
+        with np.errstate(divide='raise'):
+            try:
+                -np.sum(np.log(La))
+            except :
+                print(t, La[:t+1,:])
+                print("GQ",GQ[:t+1,:,:])
 
     return -np.sum(np.log(La))
 
@@ -132,6 +124,7 @@ def eval_LL_RL(params, observations, actions):
     observations: sequence of transition and outcome observations
     actions: sequence of taken actions
     """
+
     a1 = params[0]
     a2 = params[1]
     lam = params[2]
@@ -201,6 +194,7 @@ def MLE_magiccarpet(params, obs, actions, learning, lower_bounds, upper_bounds, 
     model: active inference (AI) or reinforcement learning (RL)
     mtype: submodel type for active inference
     """
+
     np.random.seed(seed)
 
     nump = len(params)
@@ -247,7 +241,9 @@ def MLE_magiccarpet(params, obs, actions, learning, lower_bounds, upper_bounds, 
     return params[:,best_iter], LL[best_iter], LL
 
 # Input is an integer from sbatch, serving as reference to 1 subject, as well as setting the random seed.
-s = int(sys.argv[1]) - 1 # batch is submitted 1-to-n_subs
+s = 1
+# If you are batching this code with SKRUM, uncomment the following line:
+#s = int(sys.argv[1]) - 1 # batch is submitted 1-to-n_subs 
 
 # spaceship or magic_carpet
 model = "AI" # RL or AI

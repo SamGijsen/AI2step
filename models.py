@@ -21,7 +21,7 @@ class learn_and_act():
                 Model:
                     * act: RL or AI
                     if RL, then required arguments:
-                        * learn: RL
+                        * learn: "RL"
                         * learn_transitions: False
                         * lr1: learning rate for first stage
                         * lr2: learning rate for second stage
@@ -31,7 +31,7 @@ class learn_and_act():
                         * p: response stickiness parameter
                         * w: model-based weight
                     if AI, then:
-                        * learn: PSM
+                        * learn: "PSM"
                         * learn_transitions: False
                         * lr: learning rate
                         * vunsamp: volatility/decay rate for beliefs of unsampled actions
@@ -151,7 +151,77 @@ class learn_and_act():
         return self.actions, self.observations, self.pi, self.p_trans, self.p_r, self.GQ
 
 
+    def perform_trial(self, t, pa, po):
+        """
+        Advances task by one trial by advancing through by steps.
+        Differences to running a full task:
+        - actions are provided (pa: [1x2])
+        - observations are provided (po: [1x2])
+        - particularly interesting are the distributions over actions/policies, rather than actions themselves
+        """
+
+        for step in range(self.Steps):
+            if step == 0:
+                state = 0
+            else:
+                state = o + 1
+                self.counts[a_t, o] += 1
+
+            # Action selection --------------------------------------
+            if self.model["act"] == "RL":
+                a_t, gq = self.action_selection_RL(state, self.model["b1"], self.model["b2"], self.model["w"], self.model["p"], self.Qb, self.Qf, self.prev_a)
+
+            elif self.model["act"] == "AI":
+                if step == 0:
+                    gamma = self.model["gamma1"]
+                else:
+                    gamma = self.model["gamma2"]
+
+                a_t, self.GQ[t,state,:] = self.action_selection_AI(t, state, self.model, gamma, self.model["learn"])
+
+            a_t = pa[step]
+
+            if step == 0: 
+                self.prev_a = np.copy(a_t)
+
+            # Interact (Fixed) --------------------------------------
+            o = po[step]
+
+            # Update ------------------------------------------------
+            if self.model["learn"] == "RL": 
+                # Update Q-values
+                if step == 1:
+                    self.Qf = self.update_SARSA(self, self.model["lr1"], self.model["lr2"], self.model["lam"], self.Qf, self.prev_a, a_t, state, o)
+                    self.Qb[1:,:] = np.copy(self.Qf[1:,:]) # MB equals MF for the final stage
+                    self.Qb = self.update_MB()
+
+            elif self.model["act"] == "AI" and step == 1:
+                if state == 1:
+                    ao = 2
+                if state == 2:
+                    ao = 4
+
+                self.pi = self.PSM_learning(t, step, a_t+ao, o, self.pi, self.model["lr"], self.model["vunsamp"], self.model["vsamp"], self.model["vps"], 
+                                        self.model["prior_r"], self.model["learn_transitions"])
+
+            # Determine most likely transition matrix
+            if (self.counts[0,0] + self.counts[1,1]) > (self.counts[0,1] + self.counts[1,0]):
+                self.tm = np.array([0.3, 0.7])
+            if (self.counts[0,0] + self.counts[1,1]) < (self.counts[0,1] + self.counts[1,0]):
+                self.tm = np.array([0.7, 0.3])
+            if (self.counts[0,0] + self.counts[1,1]) == (self.counts[0,1] + self.counts[1,0]):
+                self.tm = np.array([0.5, 0.5])
+
+            self.actions[t,step] = a_t
+            self.observations[t,step] = o #+ state*2
+
+        if self.model["learn"] == "RL":
+            GQ[t,:,:] = self.model["w"]*Qb + (1-self.model["w"])*Qf
+
+        return self.actions, self.observations, self.pi, self.p_trans, self.p_r, self.GQ
+
     def PSM_learning(self, t, step, a, o, pi, lr, vunsamp, vsamp, vps, prior_r=0.5, learn_transitions=False):
+
         # Predictive-Surprise Modulated learning
         prior_nu = 2
 
@@ -231,7 +301,7 @@ class learn_and_act():
         learning": type of learning algorithm
         gamma: softmax inverse temperature parameter controlling for decision noise (model parameter)
         prior_r: \alpha / (\alpha + \beta) of prior Beta-distribution, i.e. the prior reward probability(model parameter)
-        learn_transitions:
+        learn_transitions: whether state-transition probabilities are known to be 0.3 and 0.7 
         """
 
         lr = self.model["lr"]

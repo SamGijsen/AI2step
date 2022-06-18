@@ -245,17 +245,25 @@ s = 1
 # If you are batching this code with SKRUM, uncomment the following line:
 #s = int(sys.argv[1]) - 1 # batch is submitted 1-to-n_subs 
 
+# spaceship or magic_carpet
 model = "AI" # RL or AI
-learning = "PSM" # Q, PSM, ...
-task = "shock" 
+learning = "PSM" # Q, PSM
+task = "spaceship" # spaceship or magic_carpet
 
-ultra = 0
-model_ID = "M" +  str(ultra)# custom note
+mtype = 0
 
-pfdir = "/scratch/samgijsen/project/DynamicAI/hierarchicalFittingAndModelComparison/data/"
-trial_type = 0 # Self=0, Other=1
-T = 136
+model_ID = "M" +  str(mtype) # custom note
 
+if task == "spaceship": # 21 subjects
+    T = 250
+elif task == "magic_carpet": # 24 subjects
+    T = 201
+
+# participant choice data 
+
+pfdir = "/home/sam/code/CodeNov21/muddled_models/results/" + task + "/choices/"
+
+# Different model setups
 if model == "RL":
     p_names = ["lr1", "lr2", "lam", "b1", "b2", "p", "w"]
     lower_bounds = np.array([0, 0, 0, 0, 0, -1, 0])
@@ -289,49 +297,51 @@ mc_files.sort()
 subs = []
 
 for f in mc_files:
-    if task == "shock":
-        if f.endswith('MFMB.mat'):
+    
+    if task == "spaceship":
+        if f.endswith('csv') and not f.endswith('practice.csv'):
             subs.append(f)
-
+            
+    elif task == "magic_carpet":
+        if f.endswith('_game.csv'):
+            subs.append(f)
+            
 n_subs = len(subs)
-T_adj = np.zeros(n_subs)
 
 # Load in results file
-pf = load_obj(pfdir + subs[s])
-lg = pf["lg"]
+pf = pd.read_csv(pfdir + subs[s])
 
-transitions = []
+# Identify very fast and slow trials
+badtrials = np.concatenate((np.argwhere(pf["rt1"].values < 0)[:, 0], np.argwhere(pf["rt2"].values < 0)[:, 0]))
+badtrials = np.sort(np.unique(badtrials))
 
-badtrials = np.argwhere(np.isnan(lg[:,3]))
-lg = np.delete(lg, badtrials,axis=0) # delete bad trials
-lg = np.delete(lg, np.argwhere(lg[:,4]==((1-trial_type) + 1)), axis=0) # delete irrelevant condition
+if task == "spaceship":
+    actions_i = []
 
-actions_i = lg[:,0] - 1
-actions_f = lg[:,3] - 1
-rewards = lg[:,1]
-for t in range(lg.shape[0]):
-    if lg[t,3] > 2:
-        actions_f[t] -= 2
-                
-    if lg[t,0] == 1 and lg[t,2] == 0: # rare
-        transitions.append(1)
-    elif lg[t,0] == 1 and lg[t,2] == 1: # common
-        transitions.append(0)
-    elif lg[t,0] == 2 and lg[t,2] == 0: # rare
-        transitions.append(0)
-    elif lg[t,0] == 2 and lg[t,2] == 1: # common
-        transitions.append(1)
-                    
-actions = np.zeros((lg.shape[0],2))
-observations = np.zeros((lg.shape[0],2))
-T_adj[s] = int(lg.shape[0])
+    actions_f = pf["choice2"].values + 1
+    transitions = pf["final_state"].values + 1
+    
+    for t in range(len(pf["choice1"].values)):
+        if pf["common"].values[t]:
+            actions_i.append(pf["final_state"].values[t] + 1)
+        else:
+            actions_i.append(2 - pf["final_state"].values[t])
 
-actions[:,0] = actions_i      
-actions[:,1] = actions_f
-observations[:,0] = transitions
-observations[:,1] = rewards
-actions = actions.astype(int)
-observations = observations.astype(int)
+elif task == "magic_carpet":
+    
+    actions_i = pf["choice1"].values
+    actions_f = pf["choice2"].values
+    transitions = pf["final_state"].values
+
+rewards = pf["reward"].values
+
+actions = np.zeros((T,2))
+observations = np.zeros((T,2))
+
+actions[:,0] = np.delete(actions_i, badtrials) - 1
+actions[:,1] = np.delete(actions_f, badtrials) - 1
+observations[:,0] = np.delete(transitions, badtrials) - 1
+observations[:,1] = np.delete(rewards, badtrials)
 
 max_p, max_LL, LLs = MLE_magiccarpet(p_names, 
                                         observations.astype(int), 
@@ -340,8 +350,8 @@ max_p, max_LL, LLs = MLE_magiccarpet(p_names,
                                         lower_bounds, 
                                         upper_bounds,
                                         n_starts,
-                                        curious,
                                         model=model,
+                                        mtype=mtype,
                                         seed=s)
 
 results_formatted = {"max_p": max_p,
@@ -349,5 +359,4 @@ results_formatted = {"max_p": max_p,
                      "LLs": LLs}
 
 save_obj(results_formatted, 
-"/.../mfit/" + task + "/ultra/" + subs[s] + "_type_"  + str(trial_type) + "_" + learning + "_" + model_ID)
-
+"/.../mfit/" + task + "/models/" + subs[s] + "_" + learning + "_" + model_ID)
