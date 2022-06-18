@@ -12,9 +12,9 @@ AI2Step
     +- `models.py`: contains RL and active inference learning and action selection algorithms. 
     See below for example usage. Uses the following two files for support:
 
-    (Code for fitting and maximum likelihood estimation.These may be easily integrated into one file if preferred. 
-    Requires the data from the publications below.)
-    +- `MagicCarpet_Spaceship_evaluator.py`
+    Code for fitting and maximum likelihood estimation. These may be easily integrated into one file if preferred. 
+    (Requires the data from the publications below.)
+    +- `MCSP_evaluator.py`(Magic Carpet and Spaceship datasets)
     +- `Online_evaluator.py`
     +- `Shock_evaluator.py`
     
@@ -74,7 +74,7 @@ da Silva, C. F. & Hare, T. A. Humans primarily use model-based inference in the 
         "prior_r": 0.5
         }
         
-    temp = models.learn_and_act(task, model, seed=1)
-    actions, observations, beliefs, p_trans, p_r, Q = temp.perform_task()
+    AI = models.learn_and_act(task, model, seed=1)
+    actions, observations, beliefs, p_trans, p_r, Q = AI.perform_task()
         
 ```
