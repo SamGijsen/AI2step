@@ -64,11 +64,12 @@ class learn_and_act():
             self.pi[:,:,1,1] *= 7
 
         # Integrate prior parameters
-        prior_nu = 2
-        self.prior = np.array([(1-self.model["prior_r"])*prior_nu, self.model["prior_r"]*prior_nu])
-        for step in range(self.Steps):
-            for a in range(2,6):
-                self.pi[:,step,:,a] = self.prior
+        if model["act"] == "AI":
+            prior_nu = 2
+            self.prior = np.array([(1-self.model["prior_r"])*prior_nu, self.model["prior_r"]*prior_nu])
+            for step in range(self.Steps):
+                for a in range(2,6):
+                    self.pi[:,step,:,a] = self.prior
 
         # Recordings
         self.actions = np.zeros((self.T,self.Steps)).astype(int)
@@ -100,7 +101,7 @@ class learn_and_act():
 
                 # Action selection --------------------------------------
                 if self.model["act"] == "RL":
-                    a_t, gq = self.action_selection_RL(state, self.model["b1"], self.model["b2"], self.model["w"], self.model["p"], self.Qb, self.Qf, self.prev_a)
+                    a_t, gq = self.action_selection_RL(state)
 
                 elif self.model["act"] == "AI":
                     if step == 0:
@@ -108,7 +109,7 @@ class learn_and_act():
                     else:
                         gamma = self.model["gamma2"]
 
-                    a_t, self.GQ[t,state,:] = self.action_selection_AI(t, state, self.model, gamma, self.model["learn"])
+                    a_t, self.GQ[t,state,:] = self.action_selection_AI(t, state, gamma, self.model["learn"])
 
                 if step == 0: 
                     self.prev_a = np.copy(a_t)
@@ -120,16 +121,13 @@ class learn_and_act():
                 if self.model["learn"] == "RL": 
                     # Update Q-values
                     if step == 1:
-                        self.Qf = self.update_SARSA(self, self.model["lr1"], self.model["lr2"], self.model["lam"], self.Qf, self.prev_a, a_t, state, o)
+                        self.Qf = self.update_SARSA(a_t, state, o)
                         self.Qb[1:,:] = np.copy(self.Qf[1:,:]) # MB equals MF for the final stage
                         self.Qb = self.update_MB()
 
                 elif self.model["act"] == "AI" and step == 1:
-                    if state == 1:
-                        ao = 2
-                    if state == 2:
-                        ao = 4
 
+                    ao = state*2
                     self.pi = self.PSM_learning(t, step, a_t+ao, o, self.pi, self.model["lr"], self.model["vunsamp"], self.model["vsamp"], self.model["vps"], 
                                             self.model["prior_r"], self.model["learn_transitions"])
 
@@ -145,7 +143,7 @@ class learn_and_act():
                 self.observations[t,step] = o #+ state*2
 
             if self.model["learn"] == "RL":
-                GQ[t,:,:] = self.model["w"]*Qb + (1-self.model["w"])*Qf
+                self.GQ[t,:,:] = self.model["w"]*self.Qb + (1-self.model["w"])*self.Qf
 
         return self.actions, self.observations, self.pi, self.p_trans, self.p_r, self.GQ
 
@@ -168,7 +166,7 @@ class learn_and_act():
 
             # Action selection --------------------------------------
             if self.model["act"] == "RL":
-                a_t, gq = self.action_selection_RL(state, self.model["b1"], self.model["b2"], self.model["w"], self.model["p"], self.Qb, self.Qf, self.prev_a)
+                a_t, gq = self.action_selection_RL(state)
 
             elif self.model["act"] == "AI":
                 if step == 0:
@@ -176,7 +174,7 @@ class learn_and_act():
                 else:
                     gamma = self.model["gamma2"]
 
-                a_t, self.GQ[t,state,:] = self.action_selection_AI(t, state, self.model, gamma, self.model["learn"])
+                a_t, self.GQ[t,state,:] = self.action_selection_AI(t, state, gamma, self.model["learn"])
 
             a_t = pa[step]
 
@@ -190,16 +188,13 @@ class learn_and_act():
             if self.model["learn"] == "RL": 
                 # Update Q-values
                 if step == 1:
-                    self.Qf = self.update_SARSA(self, self.model["lr1"], self.model["lr2"], self.model["lam"], self.Qf, self.prev_a, a_t, state, o)
+                    self.Qf = self.update_SARSA(a_t, state, o)
                     self.Qb[1:,:] = np.copy(self.Qf[1:,:]) # MB equals MF for the final stage
                     self.Qb = self.update_MB()
 
             elif self.model["act"] == "AI" and step == 1:
-                if state == 1:
-                    ao = 2
-                if state == 2:
-                    ao = 4
 
+                ao = state*2
                 self.pi = self.PSM_learning(t, step, a_t+ao, o, self.pi, self.model["lr"], self.model["vunsamp"], self.model["vsamp"], self.model["vps"], 
                                         self.model["prior_r"], self.model["learn_transitions"])
 
@@ -215,7 +210,7 @@ class learn_and_act():
             self.observations[t,step] = o #+ state*2
 
         if self.model["learn"] == "RL":
-            GQ[t,:,:] = self.model["w"]*Qb + (1-self.model["w"])*Qf
+            self.GQ[t,:,:] = self.model["w"]*self.Qb + (1-self.model["w"])*self.Qf
 
         return self.actions, self.observations, self.pi, self.p_trans, self.p_r, self.GQ
 
@@ -247,20 +242,28 @@ class learn_and_act():
         return pi
 
 
-    def update_SARSA(self, lr1, lr2, lam, a1, a2, state, o):
+    def update_SARSA(self, a2, state, o):
         # SARSA(\lambda): temporal difference learning
         # Q contains our Q-values: Q_TD(s,a)
 
-        PE_i = self.Q[state,a2] - self.Q[0,a1]
-        PE_f = o - self.Q[state,a2]
-        self.Q[0,a1] = self.Q[0,a1] + lr1*PE_i + lr1*lam*PE_f
+        lr1 = self.model["lr1"]
+        lr2 = self.model["lr2"]
+        lam = self.model["lam"]
 
-        self.Q[state,a2] = self.Q[state,a2] + lr2*PE_f
+        PE_i = self.Qf[state,a2] - self.Qf[0,self.prev_a]
+        PE_f = o - self.Qf[state,a2]
+        self.Qf[0,self.prev_a] = self.Qf[0,self.prev_a] + lr1*PE_i + lr1*lam*PE_f
+
+        self.Qf[state,a2] = self.Qf[state, a2] + lr2*PE_f
+
+        return self.Qf
 
 
     def update_MB(self):
 
-        self.Q[0,:] = (1-self.tm) * np.max(self.Q[1,:]) + self.tm*np.max(self.Q[2,:])
+        self.Qb[0,:] = (1-self.tm) * np.max(self.Qb[1,:]) + self.tm*np.max(self.Qb[2,:])
+
+        return self.Qb
 
 
     def compute_drift_EFE(self, t, step, state, lr, vunsamp, vsamp, vps, ao, lam, prior_r=0.5, learn_transitions=False):
@@ -282,7 +285,7 @@ class learn_and_act():
         return G
 
 
-    def action_selection_AI(self, t, state, model, gamma, learning, learn_transitions=False):
+    def action_selection_AI(self, t, state, gamma, learning, learn_transitions=False):
         """
         ~~~~~~
         INPUTS
@@ -355,18 +358,24 @@ class learn_and_act():
         return np.random.choice(np.arange(2),p=np.exp(Gg)/np.sum(np.exp(Gg))), Gg        
 
 
-    def action_selection_RL(self, state, b1, b2, w, p, prev_a):
+    def action_selection_RL(self, state):
         # Softmax with step-dependent Beta (inverse temperature) parameters
 
+        b1 = self.model["b1"]
+        b2 = self.model["b2"]
+        w = self.model["w"]
+        p = self.model["w"]
+
         rep = np.zeros(2)
-        if prev_a<2:
-            rep[prev_a] = 1
+        if self.prev_a<2:
+            rep[self.prev_a] = 1
 
         probs = np.zeros(2)
 
         if state == 0:
             for a in range(2):
-                probs[a] = np.exp(b1 * (w*self.Qb[state,a] + (1-w)*self.Qf[state,a] + p*rep[a])) / np.sum(np.exp(b1* (w*self.Qb[state,:] + (1-w)*self.Qf[state,:] + p*rep[:])))
+                probs[a] = np.exp(b1 * (w*self.Qb[state,a] + (1-w)*self.Qf[state,a] + p*rep[a])) \
+                / np.sum(np.exp(b1* (w*self.Qb[state,:] + (1-w)*self.Qf[state,:] + p*rep[:])))
         else:
             for a in range(2):
                 probs[a] = np.exp(b2*self.Qf[state,a]) / np.sum(np.exp(b2*(self.Qf[state,:])))
