@@ -14,9 +14,10 @@ AI2Step
 
     Code for fitting and maximum likelihood estimation. These may be easily integrated into one file if preferred. 
     (Requires the data from the publications below.)
-    +- `MCSP_evaluator.py`(Magic Carpet and Spaceship datasets)
-    +- `Online_evaluator.py`
-    +- `Shock_evaluator.py`
+    +- `MCSP_evaluator.py`(Magic Carpet and Spaceship datasets): loads and preprocesses data prior to MLE.
+    +- `Online_evaluator.py`: idem, but for the Online dataset.
+    +- `Shock_evaluator.py`: idem, but for the Shock dataset.
+    +- 'MLE.py': Is called by the prior files for log-likelihood and ML estimation.
     
   ├── utils: helper functions    
       +- `twostep_environment.py`: contains the code for the two-step task 
@@ -74,7 +75,7 @@ da Silva, C. F. & Hare, T. A. Humans primarily use model-based inference in the 
         "prior_r": 0.5
         }
         
-    AI = models.learn_and_act(task, model, seed=1)
-    actions, observations, beliefs, p_trans, p_r, Q = AI.perform_task()
+    AI = models.learn_and_act(task, model, seed=1) # Generate task environment and initialise agent
+    actions, observations, beliefs, p_trans, p_r, Q = AI.perform_task() # Agent interacts with task
         
 ```
