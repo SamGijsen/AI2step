@@ -45,7 +45,6 @@ class learn_and_act():
                 * A sequence of agent actions
                 * A sequence of agent observations
                 * A sequence of agent beliefs
-
         """
 
         self.task = task
@@ -76,7 +75,7 @@ class learn_and_act():
         self.observations = np.zeros((self.T,self.Steps)).astype(int)
         self.GQ = np.zeros((self.T,3,2))
         self.prev_a = 999
-        self.o=999
+        self.o = 999
 
         self.Qb = np.zeros((3,2))
         self.Qf = np.zeros((3,2))

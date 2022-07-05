@@ -84,7 +84,7 @@ def eval_LL_AI(params, observations, actions, learning, mtype):
         "prior_r": prior_r
         }
 
-    temp = test_models.learn_and_act(task, model, seed=1)
+    temp = models.learn_and_act(task, model, seed=1)
     La = np.ones((T,2))
 
     po = np.zeros(2)
