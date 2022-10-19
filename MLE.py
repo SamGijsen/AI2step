@@ -66,7 +66,8 @@ def eval_LL_AI(params, observations, actions, learning, mtype):
         "T": T,
         "x": False,
         "r": True,
-        "delta": 0.025
+        "delta": 0.025,
+        "bounds": [0.25 ,0.75]
     }
     
     model = { # Model specification
@@ -97,14 +98,10 @@ def eval_LL_AI(params, observations, actions, learning, mtype):
 
         a, o, pi, p_trans, p_r, GQ = temp.perform_trial(t, pa, po)
 
-        # softmax for both stages
-        GQ[t,0,:] = np.exp(GQ[t,0,:]) / np.sum(np.exp(GQ[t,0,:]))
-        GQ[t,po[0]+1,:] = np.exp(GQ[t,po[0]+1,:]) / np.sum(np.exp(GQ[t,po[0]+1,:]))
-
         La[t,0] = GQ[t, 0, pa[0]]
         La[t,1] = GQ[t, po[0]+1, pa[1]]
 
-    return -np.sum(np.log(La))
+    return -np.sum(np.log(La)), GQ
 
 def eval_LL_RL(params, observations, actions):
     """
@@ -126,7 +123,8 @@ def eval_LL_RL(params, observations, actions):
         "T": T,
         "x": False,
         "r": True,
-        "delta": 0.025
+        "delta": 0.025,
+        "bounds": [0.25, 0.75]
     }
     
     model = { # Model specification
@@ -155,14 +153,10 @@ def eval_LL_RL(params, observations, actions):
 
         a, o, pi, p_trans, p_r, GQ = temp.perform_trial(t, pa, po)
 
-        # softmax for both stages
-        GQ[t,0,:] = np.exp(GQ[t,0,:]) / np.sum(np.exp(GQ[t,0,:]))
-        GQ[t,po[0]+1,:] = np.exp(GQ[t,po[0]+1,:]) / np.sum(np.exp(GQ[t,po[0]+1,:]))
-
         La[t,0] = GQ[t, 0, pa[0]]
         La[t,1] = GQ[t, po[0]+1, pa[1]]
 
-    return -np.sum(np.log(La))
+    return -np.sum(np.log(La)),GQ
 
 def MLE_procedure(params, observations, actions, learning, lower_bounds, upper_bounds, n_starts, model, mtype, seed=1):
     """

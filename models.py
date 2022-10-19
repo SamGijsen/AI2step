@@ -103,7 +103,7 @@ class learn_and_act():
 
                 # Action selection --------------------------------------
                 if self.model["act"] == "RL":
-                    a_t, gq = self.action_selection_RL(state)
+                    a_t, self.GQ[t,state,:] = self.action_selection_RL(state)
 
                 elif self.model["act"] == "AI":
                     if step == 0:
@@ -144,8 +144,6 @@ class learn_and_act():
                 self.actions[t,step] = a_t
                 self.observations[t,step] = o #+ state*2
 
-            if self.model["learn"] == "RL":
-                self.GQ[t,:,:] = self.model["w"]*self.Qb + (1-self.model["w"])*self.Qf
 
         return self.actions, self.observations, self.pi, self.p_trans, self.p_r, self.GQ
 
@@ -168,7 +166,7 @@ class learn_and_act():
 
             # Action selection --------------------------------------
             if self.model["act"] == "RL":
-                a_t, gq = self.action_selection_RL(state)
+                a_t, self.GQ[t,state,:] = self.action_selection_RL(state)
 
             elif self.model["act"] == "AI":
                 if step == 0:
@@ -211,8 +209,6 @@ class learn_and_act():
             self.actions[t,step] = a_t
             self.observations[t,step] = o #+ state*2
 
-        if self.model["learn"] == "RL":
-            self.GQ[t,:,:] = self.model["w"]*self.Qb + (1-self.model["w"])*self.Qf
 
         return self.actions, self.observations, self.pi, self.p_trans, self.p_r, self.GQ
 
@@ -356,8 +352,9 @@ class learn_and_act():
             G = G_s2
 
         Gg = np.clip(-G * gamma,-500,500)
+        probs = np.exp(Gg)/np.sum(np.exp(Gg))
 
-        return np.random.choice(np.arange(2),p=np.exp(Gg)/np.sum(np.exp(Gg))), Gg        
+        return np.random.choice(np.arange(2),p=probs), probs       
 
 
     def action_selection_RL(self, state):
@@ -366,7 +363,7 @@ class learn_and_act():
         b1 = self.model["b1"]
         b2 = self.model["b2"]
         w = self.model["w"]
-        p = self.model["w"]
+        p = self.model["p"]
 
         rep = np.zeros(2)
         if self.prev_a<2:
